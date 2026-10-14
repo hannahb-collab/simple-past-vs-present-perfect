@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Grammar Quest: Boss Battle Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f5ff',
+                            100: '#e0ebff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        },
+                        boss: {
+                            400: '#f43f5e',
+                            500: '#e11d48',
+                            600: '#be123c',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-short': 'bounceShort 0.5s ease-in-out infinite alternate',
+                        'float': 'float 3s ease-in-out infinite',
+                        'shake': 'shake 0.4s cubic-bezier(.36,.07,.19,.97) both',
+                        'crit-pop': 'critPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'
+                    },
+                    keyframes: {
+                        bounceShort: {
+                            '0%': { transform: 'translateY(0)' },
+                            '100%': { transform: 'translateY(-6px)' }
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px) rotate(0deg)' },
+                            '50%': { transform: 'translateY(-10px) rotate(2deg)' }
+                        },
+                        shake: {
+                            '10%, 90%': { transform: 'translate3d(-2px, 0, 0)' },
+                            '20%, 80%': { transform: 'translate3d(4px, 0, 0)' },
+                            '30%, 50%, 70%': { transform: 'translate3d(-6px, 0, 0)' },
+                            '40%, 60%': { transform: 'translate3d(6px, 0, 0)' }
+                        },
+                        critPop: {
+                            '0%': { transform: 'scale(0.5) translateY(10px)', opacity: '0' },
+                            '50%': { transform: 'scale(1.3) translateY(-15px)', opacity: '1' },
+                            '100%': { transform: 'scale(1) translateY(-25px)', opacity: '0' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            background: #090d16;
+            color: #f8fafc;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 4px;
+        }
+
+        .glass-card {
+            background: rgba(26, 34, 52, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .btn-touch {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-touch:active {
+            transform: scale(0.95);
+        }
+
+        .highlight-signal {
+            background-color: rgba(245, 158, 11, 0.3);
+            color: #fcd34d;
+            padding: 2px 10px;
+            border-radius: 8px;
+            font-weight: 800;
+            border: 2px dashed #f59e0b;
+            display: inline-block;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+            animation: pulse 1.2s infinite;
+        }
+
+        .damage-popup {
+            position: absolute;
+            font-weight: 900;
+            font-size: 1.5rem;
+            color: #ef4444;
+            text-shadow: 0 0 8px rgba(0,0,0,0.8);
+            pointer-events: none;
+            animation: critPop 0.8s forwards;
+        }
+
+        .mode-card.selected {
+            border-color: #6366f1;
+            background-color: rgba(99, 102, 241, 0.15);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.25);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between font-sans bg-slate-950 text-slate-100 overflow-x-hidden">
+
+    <!-- Top Header Navigation -->
+    <header class="w-full bg-slate-900/90 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md px-4 py-3">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-rose-500 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-dragon"></i>
+                </div>
+                <div>
+                    <h1 class="font-black text-base md:text-lg tracking-tight bg-gradient-to-r from-white via-indigo-200 to-rose-400 bg-clip-text text-transparent">
+                        GrammarQuest: Boss Arena
+                    </h1>
+                    <p class="text-[11px] text-indigo-400 font-bold hidden sm:block">Present Perfect, Simple Past &amp; Past Participles</p>
+                </div>
+            </div>
+
+            <!-- Header Controls & Player Info -->
+            <div class="flex items-center space-x-2 md:space-x-4">
+                <div id="player-badge" class="hidden flex items-center space-x-2 bg-slate-800/90 px-3 py-1.5 rounded-full border border-slate-700">
+                    <span id="header-avatar" class="text-lg">🧙‍♂️</span>
+                    <div class="text-left leading-tight">
+                        <div id="header-name" class="text-xs font-bold text-slate-200 max-w-[90px] md:max-w-[130px] truncate">Player</div>
+                        <div id="header-class" class="text-[10px] text-indigo-400 font-bold">3A (#12)</div>
+                    </div>
+                </div>
+
+                <button id="sound-btn" onclick="toggleSound()" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center justify-center btn-touch">
+                    <i id="sound-icon" class="fa-solid fa-volume-high text-brand-400"></i>
+                </button>
+
+                <button id="nav-leaderboard-btn" onclick="switchTab('leaderboard')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 text-xs md:text-sm font-bold flex items-center space-x-2 btn-touch">
+                    <i class="fa-solid fa-trophy text-amber-400"></i>
+                    <span class="hidden md:inline">Leaderboard</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-5xl w-full mx-auto p-3 sm:p-6 flex flex-col justify-center">
+
+        <!-- SCREEN 1: LOGIN / PLAYER ENTRY -->
+        <section id="screen-login" class="w-full max-w-md mx-auto my-auto py-6">
+            <div class="glass-card rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden border border-slate-700/60">
+                <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-rose-500 to-amber-500"></div>
+
+                <div class="text-center mb-6">
+                    <span class="inline-block px-3 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-extrabold rounded-full mb-2 uppercase tracking-wider border border-indigo-500/30">RPG Battle Arena</span>
+                    <h2 class="text-2xl md:text-3xl font-black text-white">Hero Registration</h2>
+                    <p class="text-xs md:text-sm text-slate-400 mt-1">Enter your details to challenge the Grammar Titan!</p>
+                </div>
+
+                <form id="registration-form" onsubmit="handleRegistration(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Hero Name</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-user-shield absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="input-name" required placeholder="e.g. Alex Wong" class="w-full bg-slate-900/90 text-white placeholder-slate-500 pl-10 pr-4 py-3 rounded-xl border border-slate-700 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/40 text-sm font-semibold transition-all">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Class</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-school absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" id="input-class" required placeholder="e.g. 3A" class="w-full bg-slate-900/90 text-white placeholder-slate-500 pl-10 pr-4 py-3 rounded-xl border border-slate-700 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/40 text-sm font-semibold uppercase transition-all">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Class No.</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-hashtag absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="number" id="input-classno" min="1" max="50" required placeholder="e.g. 15" class="w-full bg-slate-900/90 text-white placeholder-slate-500 pl-10 pr-4 py-3 rounded-xl border border-slate-700 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/40 text-sm font-semibold transition-all">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Avatar Choice -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Choose Avatar</label>
+                        <div class="grid grid-cols-5 gap-2" id="avatar-selector">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-4 rounded-xl bg-gradient-to-r from-brand-600 via-purple-600 to-rose-600 hover:from-brand-500 hover:to-rose-500 text-white font-extrabold text-base shadow-lg shadow-indigo-600/30 flex items-center justify-center space-x-2 btn-touch mt-2">
+                        <span>Enter Arena</span>
+                        <i class="fa-solid fa-khanda text-sm"></i>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- SCREEN 2: LOBBY / QUEST SELECT -->
+        <section id="screen-lobby" class="hidden w-full max-w-3xl mx-auto space-y-6 my-auto py-4">
+            <div class="glass-card rounded-3xl p-6 md:p-8 text-center relative overflow-hidden">
+                <div class="inline-flex items-center space-x-2 px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-xs font-bold mb-3 border border-amber-500/30">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Grammar Battle Arena</span>
+                </div>
+                <h2 class="text-3xl md:text-4xl font-black text-white tracking-tight">Defeat the Grammar Titan</h2>
+                <p class="text-slate-300 text-sm md:text-base max-w-xl mx-auto mt-2 leading-relaxed">
+                    Master time signals (<span class="text-amber-400 font-bold">yesterday, ago, last week</span> vs. <span class="text-indigo-400 font-bold">for, since, already, never, ever</span>) AND master common &amp; irregular past participles (<span class="text-emerald-400 font-bold">write → written, fly → flown, drink → drunk</span>)!
+                </p>
+
+                <!-- Mode Selection Cards -->
+                <div class="mt-6 text-left">
+                    <label class="block text-xs font-black uppercase text-indigo-300 tracking-wider mb-3 text-center">Choose Battle Mode</label>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div onclick="selectMode('mixed')" id="mode-mixed" class="mode-card selected p-4 rounded-2xl bg-slate-900/90 border border-slate-700 cursor-pointer btn-touch transition-all">
+                            <div class="flex items-center space-x-2 text-amber-400 font-extrabold text-sm mb-1">
+                                <i class="fa-solid fa-dragon"></i>
+                                <span>Full Titan Challenge</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 leading-snug">Mixed 40 Questions combining Tenses &amp; Irregular Past Participles.</p>
+                        </div>
+
+                        <div onclick="selectMode('participle')" id="mode-participle" class="mode-card p-4 rounded-2xl bg-slate-900/90 border border-slate-700 cursor-pointer btn-touch transition-all">
+                            <div class="flex items-center space-x-2 text-emerald-400 font-extrabold text-sm mb-1">
+                                <i class="fa-solid fa-bolt"></i>
+                                <span>Past Participle Dojo</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 leading-snug">Targeted drill testing common &amp; irregular 3rd verb forms (V3).</p>
+                        </div>
+
+                        <div onclick="selectMode('tense')" id="mode-tense" class="mode-card p-4 rounded-2xl bg-slate-900/90 border border-slate-700 cursor-pointer btn-touch transition-all">
+                            <div class="flex items-center space-x-2 text-indigo-400 font-extrabold text-sm mb-1">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                <span>Tense Comparison</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 leading-snug">Focus on Simple Past vs. Present Perfect time markers.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rules Quick Bar -->
+                <div class="grid grid-cols-3 gap-3 my-6 max-w-md mx-auto">
+                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 text-center">
+                        <i class="fa-solid fa-bolt text-amber-400 text-xl mb-1"></i>
+                        <div class="text-[10px] text-slate-400 uppercase font-bold">Speed Crit</div>
+                        <div class="text-sm font-extrabold text-white">&lt;5s = 1.5x Dmg</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 text-center">
+                        <i class="fa-solid fa-fire text-rose-500 text-xl mb-1"></i>
+                        <div class="text-[10px] text-slate-400 uppercase font-bold">Combos</div>
+                        <div class="text-sm font-extrabold text-white">Streak Multiplier</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 text-center">
+                        <i class="fa-solid fa-wand-magic-sparkles text-cyan-400 text-xl mb-1"></i>
+                        <div class="text-[10px] text-slate-400 uppercase font-bold">Spells</div>
+                        <div class="text-sm font-extrabold text-white">3 Lifelines</div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <button onclick="startQuiz()" class="px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-lg shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-3 btn-touch">
+                        <i class="fa-solid fa-swords text-xl"></i>
+                        <span>Start Battle</span>
+                    </button>
+                    <button onclick="switchTab('leaderboard')" class="px-6 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-base flex items-center justify-center space-x-2 btn-touch">
+                        <i class="fa-solid fa-trophy text-amber-400"></i>
+                        <span>View Hall of Fame</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 3: GAMEPLAY ARENA -->
+        <section id="screen-game" class="hidden w-full max-w-3xl mx-auto space-y-4">
+            
+            <!-- RPG BOSS & PLAYER HUD HEADER -->
+            <div id="battle-hud" class="glass-card rounded-2xl p-4 shadow-xl relative overflow-hidden border border-slate-700">
+                <div class="grid grid-cols-2 gap-4 items-center">
+                    
+                    <!-- Player Health Card -->
+                    <div class="flex items-center space-x-3">
+                        <div id="player-avatar-battle" class="text-3xl p-2 rounded-xl bg-indigo-950/80 border border-indigo-500/40">🧙‍♂️</div>
+                        <div class="w-full">
+                            <div class="flex justify-between items-center text-xs font-bold mb-1">
+                                <span id="player-hud-name" class="text-indigo-300">Player</span>
+                                <span id="player-hp-text" class="text-emerald-400">100 / 100 HP</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700">
+                                <div id="player-hp-bar" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full w-full transition-all duration-300"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Boss Health Card -->
+                    <div class="flex items-center space-x-3 flex-row-reverse space-x-reverse">
+                        <div id="boss-sprite" class="text-3xl p-2 rounded-xl bg-rose-950/80 border border-rose-500/40 animate-float">👹</div>
+                        <div class="w-full text-right">
+                            <div class="flex justify-between items-center text-xs font-bold mb-1 flex-row-reverse">
+                                <span class="text-rose-400">Grammar Titan</span>
+                                <span id="boss-hp-text" class="text-rose-400">4000 / 4000 HP</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700">
+                                <div id="boss-hp-bar" class="bg-gradient-to-r from-rose-600 to-amber-500 h-full w-full transition-all duration-300"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Stats Bar -->
+                <div class="flex justify-between items-center mt-3 pt-3 border-t border-slate-800/80 text-xs font-bold">
+                    <div class="flex items-center space-x-2">
+                        <div class="relative flex items-center justify-center">
+                            <svg class="w-8 h-8 transform -rotate-90">
+                                <circle cx="16" cy="16" r="13" stroke="currentColor" stroke-width="3" class="text-slate-800" fill="transparent" />
+                                <circle id="timer-progress" cx="16" cy="16" r="13" stroke="currentColor" stroke-width="3" class="text-brand-500 transition-all duration-1000" fill="transparent" stroke-dasharray="81.6" stroke-dashoffset="0" />
+                            </svg>
+                            <span id="game-timer" class="absolute text-[10px] font-black text-white">30s</span>
+                        </div>
+                        <span class="text-slate-400">Q: <span id="current-q-num" class="text-white font-extrabold">1</span>/<span id="total-q-num">40</span></span>
+                    </div>
+
+                    <div class="flex items-center space-x-3">
+                        <div class="px-2.5 py-1 bg-amber-500/10 rounded-lg border border-amber-500/20 text-amber-400 flex items-center space-x-1">
+                            <i class="fa-solid fa-fire text-amber-400 animate-bounce-short"></i>
+                            <span id="streak-count">0x Combo</span>
+                        </div>
+
+                        <div class="text-indigo-300 font-extrabold text-sm">
+                            Score: <span id="game-score" class="text-white">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Question Card -->
+            <div id="question-card" class="glass-card rounded-3xl p-6 md:p-8 space-y-6 relative overflow-hidden border border-slate-700 shadow-2xl">
+                
+                <!-- Spells / Powerups -->
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <span id="question-category" class="text-xs font-bold px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full border border-indigo-500/30">
+                        Battle Stage <span id="stage-num">1</span>
+                    </span>
+
+                    <div class="flex space-x-2">
+                        <button id="powerup-freeze" onclick="useTimeFreeze()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-cyan-300 flex items-center space-x-1 btn-touch">
+                            <i class="fa-solid fa-snowflake text-cyan-400"></i>
+                            <span class="hidden sm:inline">Freeze</span>
+                            <span id="count-freeze" class="ml-1 px-1 bg-cyan-950 rounded text-[10px]">2</span>
+                        </button>
+
+                        <button id="powerup-5050" onclick="use5050()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-rose-300 flex items-center space-x-1 btn-touch">
+                            <i class="fa-solid fa-scissors text-rose-400"></i>
+                            <span class="hidden sm:inline">50/50</span>
+                            <span id="count-5050" class="ml-1 px-1 bg-rose-950 rounded text-[10px]">2</span>
+                        </button>
+
+                        <button id="powerup-hint" onclick="useHint()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-amber-300 flex items-center space-x-1 btn-touch">
+                            <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                            <span class="hidden sm:inline">Oracle</span>
+                            <span id="count-hint" class="ml-1 px-1 bg-amber-950 rounded text-[10px]">2</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sentence Display -->
+                <div class="py-2 min-h-[90px] flex items-center justify-center">
+                    <p id="question-text" class="text-lg md:text-2xl font-bold leading-relaxed text-slate-100 text-center">
+                        Loading Question...
+                    </p>
+                </div>
+
+                <!-- Options Grid -->
+                <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-2">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- Explanation Drawer -->
+                <div id="explanation-box" class="hidden p-4 rounded-2xl bg-slate-900/90 border border-slate-700 transition-all duration-300">
+                    <div class="flex items-start space-x-3">
+                        <div id="explanation-icon" class="text-xl pt-0.5">💡</div>
+                        <div class="space-y-1">
+                            <div id="explanation-title" class="text-xs font-black uppercase tracking-wider text-slate-300">Grammar Clue Analysis</div>
+                            <p id="explanation-text" class="text-xs md:text-sm text-slate-300 leading-relaxed"></p>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex justify-end">
+                        <button id="next-btn" onclick="nextQuestion()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-extrabold text-sm flex items-center space-x-2 btn-touch">
+                            <span>Next Strike</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 4: RESULTS & CERTIFICATE -->
+        <section id="screen-results" class="hidden w-full max-w-2xl mx-auto space-y-6 my-auto py-6">
+            <div class="glass-card rounded-3xl p-6 md:p-8 text-center relative overflow-hidden border border-slate-700/80 shadow-2xl">
+                
+                <div id="result-icon-bg" class="w-20 h-20 mx-auto rounded-full bg-gradient-to-tr from-amber-400 to-amber-600 flex items-center justify-center text-white text-3xl shadow-xl shadow-amber-500/20 mb-4 animate-bounce-short">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+
+                <h2 id="result-title" class="text-3xl font-black text-white">Victory! Boss Defeated!</h2>
+                <p id="result-subtitle" class="text-sm text-slate-300 mt-1">Great effort on mastering past tenses &amp; participles!</p>
+
+                <!-- Key Metrics Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 my-6">
+                    <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
+                        <div class="text-[10px] font-extrabold text-slate-400 uppercase">Accuracy</div>
+                        <div id="res-accuracy" class="text-xl md:text-2xl font-black text-emerald-400">0%</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
+                        <div class="text-[10px] font-extrabold text-slate-400 uppercase">Score</div>
+                        <div id="res-score" class="text-xl md:text-2xl font-black text-indigo-400">0</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
+                        <div class="text-[10px] font-extrabold text-slate-400 uppercase">Correct</div>
+                        <div id="res-correct" class="text-xl md:text-2xl font-black text-amber-400">0 / 40</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
+                        <div class="text-[10px] font-extrabold text-slate-400 uppercase">Time Taken</div>
+                        <div id="res-time" class="text-xl md:text-2xl font-black text-cyan-400">0s</div>
+                    </div>
+                </div>
+
+                <!-- Teacher Feedback Summary -->
+                <div class="bg-indigo-950/40 p-4 rounded-2xl border border-indigo-500/30 text-left mb-6">
+                    <div class="flex items-center space-x-2 text-indigo-300 font-bold text-xs uppercase tracking-wider mb-1">
+                        <i class="fa-solid fa-scroll"></i>
+                        <span>Grammar Master Advice</span>
+                    </div>
+                    <p id="res-feedback" class="text-xs md:text-sm text-slate-300 leading-relaxed">
+                        Loading feedback...
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap gap-3 justify-center">
+                    <button onclick="toggleReviewMode()" class="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 font-extrabold text-sm flex items-center space-x-2 btn-touch">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>Review Questions</span>
+                    </button>
+                    <button onclick="resetAndPlayAgain()" class="px-5 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-extrabold text-sm flex items-center space-x-2 btn-touch">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        <span>Play Again</span>
+                    </button>
+                    <button onclick="switchTab('leaderboard')" class="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 font-extrabold text-sm flex items-center space-x-2 btn-touch">
+                        <i class="fa-solid fa-trophy"></i>
+                        <span>Leaderboard</span>
+                    </button>
+                </div>
+
+                <!-- Question Review Drawer Container -->
+                <div id="review-container" class="hidden mt-6 text-left border-t border-slate-800 pt-6 space-y-3 max-h-96 overflow-y-auto pr-1">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 5: LIVE LEADERBOARD (FIRESTORE) -->
+        <section id="screen-leaderboard" class="hidden w-full max-w-4xl mx-auto space-y-6 py-4">
+            <div class="glass-card rounded-3xl p-6 md:p-8 space-y-6 border border-slate-700">
+                
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-trophy text-amber-400 text-2xl"></i>
+                            <h2 class="text-2xl md:text-3xl font-black text-white">Live Student Standings</h2>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-0.5">Real-time synchronized rankings ordered by accuracy and score.</p>
+                    </div>
+
+                    <!-- Class Filter -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-slate-400 font-bold uppercase">Filter:</span>
+                        <select id="leaderboard-class-filter" onchange="renderLeaderboard()" class="bg-slate-900 border border-slate-700 text-white text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-brand-500">
+                            <option value="ALL">All Classes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-[10px] md:text-xs font-black uppercase text-slate-400 border-b border-slate-800">
+                                <th class="p-3">Rank</th>
+                                <th class="p-3">Hero</th>
+                                <th class="p-3">Class (#)</th>
+                                <th class="p-3 text-center">Accuracy</th>
+                                <th class="p-3 text-right">Score</th>
+                                <th class="p-3 text-right">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-rows" class="divide-y divide-slate-800/60 text-xs md:text-sm font-semibold">
+                            <tr>
+                                <td colspan="6" class="text-center py-8 text-slate-500">
+                                    <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-brand-500"></i>
+                                    <div>Connecting to live server...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex justify-center pt-2">
+                    <button onclick="returnToLobbyOrGame()" class="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-extrabold text-sm flex items-center space-x-2 btn-touch">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>Back to Arena</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="w-full text-center py-4 text-xs text-slate-500 border-t border-slate-900 mt-auto">
+        GrammarQuest RPG • Present Perfect, Simple Past &amp; Irregular Past Participles
+    </footer>
+
+    <script>
+        /* Web Audio API Sound Synthesizer */
+        let audioCtx = null;
+        let isMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (isMuted) return;
+            try {
+                initAudio();
+                const now = audioCtx.currentTime;
+
+                if (type === 'correct') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1);
+                    osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'crit') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+                    osc.frequency.exponentialRampToValueAtTime(1320, now + 0.3);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                } else if (type === 'wrong') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.setValueAtTime(164.81, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'spell') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(900, now + 0.25);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'click') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, now);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'fanfare') {
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+                        gain.gain.setValueAtTime(0.15, now + idx * 0.1);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.4);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.1);
+                        osc.stop(now + idx * 0.1 + 0.4);
+                    });
+                }
+            } catch (e) {
+                console.log("Audio not allowed yet");
+            }
+        }
+
+        function toggleSound() {
+            isMuted = !isMuted;
+            const icon = document.getElementById('sound-icon');
+            if (isMuted) {
+                icon.className = 'fa-solid fa-volume-xmark text-rose-400';
+            } else {
+                icon.className = 'fa-solid fa-volume-high text-brand-400';
+                playSound('click');
+            }
+        }
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'grammar-quest-boss-edition';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : {
+                apiKey: "AIzaSyDemoOnlyNotRealKey123456789",
+                authDomain: "demo-app.firebaseapp.com",
+                projectId: "demo-app",
+                storageBucket: "demo-app.appspot.com",
+                messagingSenderId: "1234567890",
+                appId: "1:1234567890:web:abcdef"
+            };
+
+        let app, db, auth;
+        let currentUser = null;
+        let leaderboardData = [];
+
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            const customToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            if (customToken) {
+                signInWithCustomToken(auth, customToken).catch(() => signInAnonymously(auth));
+            } else {
+                signInAnonymously(auth);
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    initLeaderboardListener();
+                }
+            });
+        } catch (e) {
+            console.warn("Firestore running in offline mode.", e);
+        }
+
+        function initLeaderboardListener() {
+            if (!db) return;
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
+            
+            onSnapshot(colRef, (snapshot) => {
+                leaderboardData = [];
+                snapshot.forEach(doc => {
+                    leaderboardData.push({ id: doc.id, ...doc.data() });
+                });
+                
+                leaderboardData.sort((a, b) => {
+                    if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
+                    if (b.score !== a.score) return b.score - a.score;
+                    return a.timeTaken - b.timeTaken;
+                });
+
+                updateClassFilterOptions();
+                window.renderLeaderboard();
+            }, (error) => {
+                console.error("Firestore snapshot error:", error);
+            });
+        }
+
+        window.saveScoreToLeaderboard = async function(playerDetails, resultMetrics) {
+            if (!currentUser || !db) return;
+
+            const docId = `${playerDetails.className}_${playerDetails.classNo}_${currentUser.uid.substring(0, 5)}`;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'leaderboard', docId);
+
+            const payload = {
+                name: playerDetails.name,
+                className: playerDetails.className.toUpperCase(),
+                classNo: parseInt(playerDetails.classNo),
+                avatar: playerDetails.avatar,
+                score: resultMetrics.score,
+                accuracy: resultMetrics.accuracy,
+                correctCount: resultMetrics.correctCount,
+                totalQuestions: resultMetrics.totalQuestions,
+                timeTaken: resultMetrics.timeTaken,
+                timestamp: Date.now(),
+                uid: currentUser.uid
+            };
+
+            try {
+                await setDoc(docRef, payload, { merge: true });
+            } catch (err) {
+                console.error("Error saving score:", err);
+            }
+        };
+
+        function updateClassFilterOptions() {
+            const select = document.getElementById('leaderboard-class-filter');
+            if (!select) return;
+            const currentVal = select.value;
+            const classes = new Set(leaderboardData.map(item => item.className));
+            
+            select.innerHTML = '<option value="ALL">All Classes</option>';
+            Array.from(classes).sort().forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = `Class ${c}`;
+                select.appendChild(opt);
+            });
+            select.value = currentVal;
+        }
+
+        window.renderLeaderboard = function() {
+            const tbody = document.getElementById('leaderboard-rows');
+            if (!tbody) return;
+
+            const filterClass = document.getElementById('leaderboard-class-filter')?.value || 'ALL';
+            const filtered = filterClass === 'ALL' 
+                ? leaderboardData 
+                : leaderboardData.filter(d => d.className === filterClass);
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-8 text-slate-500">
+                            No hero records found yet. Be the first to defeat the Titan!
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map((entry, idx) => {
+                let rankBadge = `<span class="font-black text-slate-400">#${idx + 1}</span>`;
+                if (idx === 0) rankBadge = `<span class="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-black inline-flex items-center justify-center text-xs">1</span>`;
+                if (idx === 1) rankBadge = `<span class="w-6 h-6 rounded-full bg-slate-300 text-slate-950 font-black inline-flex items-center justify-center text-xs">2</span>`;
+                if (idx === 2) rankBadge = `<span class="w-6 h-6 rounded-full bg-amber-700 text-white font-black inline-flex items-center justify-center text-xs">3</span>`;
+
+                const isMe = currentUser && entry.uid === currentUser.uid;
+
+                return `
+                    <tr class="${isMe ? 'bg-indigo-950/60 border-l-4 border-l-brand-500' : 'hover:bg-slate-900/40'} transition-colors">
+                        <td class="p-3 font-bold">${rankBadge}</td>
+                        <td class="p-3 flex items-center space-x-2">
+                            <span class="text-base">${entry.avatar || '🧙‍♂️'}</span>
+                            <span class="font-bold text-slate-200 truncate max-w-[120px] md:max-w-[180px]">${escapeHtml(entry.name)} ${isMe ? '<span class="text-[10px] text-brand-400 font-extrabold ml-1">(You)</span>' : ''}</span>
+                        </td>
+                        <td class="p-3 text-indigo-300 font-bold">${escapeHtml(entry.className)} (${entry.classNo})</td>
+                        <td class="p-3 text-center">
+                            <span class="px-2 py-0.5 rounded-full text-xs font-black ${entry.accuracy >= 80 ? 'bg-emerald-500/20 text-emerald-400' : entry.accuracy >= 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}">
+                                ${entry.accuracy}%
+                            </span>
+                        </td>
+                        <td class="p-3 text-right font-black text-white">${entry.score}</td>
+                        <td class="p-3 text-right font-bold text-slate-400">${entry.timeTaken}s</td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+    </script>
+
+    <script>
+        /* EXPANDED GRAMMAR QUESTIONS (SIMPLE PAST VS PRESENT PERFECT + IRREGULAR PAST PARTICIPLES) */
+        const QUESTION_DATABASE = [
+            // --- SECTION A: IRREGULAR PAST PARTICIPLES (20 QUESTIONS) ---
+            {
+                id: 101,
+                type: "participle",
+                sentence: "She has ______ (write) three books about space exploration.",
+                options: ["written", "wrote", "writed", "writing"],
+                answer: "written",
+                signal: "write",
+                explanation: "The past participle (V3) of 'write' is 'written' (write - wrote - written)."
+            },
+            {
+                id: 102,
+                type: "participle",
+                sentence: "Have you ever ______ (fly) in a helicopter?",
+                options: ["flown", "flew", "flyed", "flying"],
+                answer: "flown",
+                signal: "fly",
+                explanation: "The past participle (V3) of 'fly' is 'flown' (fly - flew - flown)."
+            },
+            {
+                id: 103,
+                type: "participle",
+                sentence: "The kids have ______ (drink) all the fruit juice.",
+                options: ["drunk", "drank", "drinked", "drinking"],
+                answer: "drunk",
+                signal: "drink",
+                explanation: "The past participle (V3) of 'drink' is 'drunk' (drink - drank - drunk)."
+            },
+            {
+                id: 104,
+                type: "participle",
+                sentence: "He has ______ (choose) the red sports car.",
+                options: ["chosen", "chose", "choosed", "choosing"],
+                answer: "chosen",
+                signal: "choose",
+                explanation: "The past participle (V3) of 'choose' is 'chosen' (choose - chose - chosen)."
+            },
+            {
+                id: 105,
+                type: "participle",
+                sentence: "The lake has ______ (freeze) over during the cold winter night.",
+                options: ["frozen", "froze", "freezed", "freezing"],
+                answer: "frozen",
+                signal: "freeze",
+                explanation: "The past participle (V3) of 'freeze' is 'frozen' (freeze - froze - frozen)."
+            },
+            {
+                id: 106,
+                type: "participle",
+                sentence: "She has ______ (speak) to the principal about the field trip.",
+                options: ["spoken", "spoke", "speaked", "speaking"],
+                answer: "spoken",
+                signal: "speak",
+                explanation: "The past participle (V3) of 'speak' is 'spoken' (speak - spoke - spoken)."
+            },
+            {
+                id: 107,
+                type: "participle",
+                sentence: "They have ______ (swim) across the lake twice this summer.",
+                options: ["swum", "swam", "swimmed", "swimming"],
+                answer: "swum",
+                signal: "swim",
+                explanation: "The past participle (V3) of 'swim' is 'swum' (swim - swam - swum)."
+            },
+            {
+                id: 108,
+                type: "participle",
+                sentence: "The school bell has already ______ (ring).",
+                options: ["rung", "rang", "ringed", "ringing"],
+                answer: "rung",
+                signal: "ring",
+                explanation: "The past participle (V3) of 'ring' is 'rung' (ring - rang - rung)."
+            },
+            {
+                id: 109,
+                type: "participle",
+                sentence: "My uncle has ______ (drive) trucks for over twenty years.",
+                options: ["driven", "drove", "drived", "driving"],
+                answer: "driven",
+                signal: "drive",
+                explanation: "The past participle (V3) of 'drive' is 'driven' (drive - drove - driven)."
+            },
+            {
+                id: 110,
+                type: "participle",
+                sentence: "Have you ______ (forget) your locker password again?",
+                options: ["forgotten", "forgot", "forgetted", "forgetting"],
+                answer: "forgotten",
+                signal: "forget",
+                explanation: "The past participle (V3) of 'forget' is 'forgotten' (forget - forgot - forgotten)."
+            },
+            {
+                id: 111,
+                type: "participle",
+                sentence: "The window was ______ (break) during the football match.",
+                options: ["broken", "broke", "breaked", "breaking"],
+                answer: "broken",
+                signal: "break",
+                explanation: "The past participle (V3) of 'break' is 'broken' (break - broke - broken)."
+            },
+            {
+                id: 112,
+                type: "participle",
+                sentence: "He has ______ (begin) his new martial arts class.",
+                options: ["begun", "began", "beginned", "beginning"],
+                answer: "begun",
+                signal: "begin",
+                explanation: "The past participle (V3) of 'begin' is 'begun' (begin - began - begun)."
+            },
+            {
+                id: 113,
+                type: "participle",
+                sentence: "The thief has ______ (steal) a valuable painting.",
+                options: ["stolen", "stole", "stealed", "stealing"],
+                answer: "stolen",
+                signal: "steal",
+                explanation: "The past participle (V3) of 'steal' is 'stolen' (steal - stole - stolen)."
+            },
+            {
+                id: 114,
+                type: "participle",
+                sentence: "She has ______ (grow) so tall since I last saw her!",
+                options: ["grown", "grew", "growed", "growing"],
+                answer: "grown",
+                signal: "grow",
+                explanation: "The past participle (V3) of 'grow' is 'grown' (grow - grew - grown)."
+            },
+            {
+                id: 115,
+                type: "participle",
+                sentence: "I have ______ (know) him since primary school.",
+                options: ["known", "knew", "knowed", "knowing"],
+                answer: "known",
+                signal: "know",
+                explanation: "The past participle (V3) of 'know' is 'known' (know - knew - known)."
+            },
+            {
+                id: 116,
+                type: "participle",
+                sentence: "The choir has ______ (sing) that melody beautifully.",
+                options: ["sung", "sang", "singed", "singing"],
+                answer: "sung",
+                signal: "sing",
+                explanation: "The past participle (V3) of 'sing' is 'sung' (sing - sang - sung)."
+            },
+            {
+                id: 117,
+                type: "participle",
+                sentence: "A leaf has ______ (fall) from the big oak tree.",
+                options: ["fallen", "fell", "falled", "falling"],
+                answer: "fallen",
+                signal: "fall",
+                explanation: "The past participle (V3) of 'fall' is 'fallen' (fall - fell - fallen)."
+            },
+            {
+                id: 118,
+                type: "participle",
+                sentence: "He has ______ (wear) his lucky coat every match.",
+                options: ["worn", "wore", "weared", "wearing"],
+                answer: "worn",
+                signal: "wear",
+                explanation: "The past participle (V3) of 'wear' is 'worn' (wear - wore - worn)."
+            },
+            {
+                id: 119,
+                type: "participle",
+                sentence: "They have ______ (take) all the test papers to the office.",
+                options: ["taken", "took", "taked", "taking"],
+                answer: "taken",
+                signal: "take",
+                explanation: "The past participle (V3) of 'take' is 'taken' (take - took - taken)."
+            },
+            {
+                id: 120,
+                type: "participle",
+                sentence: "Have you ______ (eat) all your vegetables yet?",
+                options: ["eaten", "ate", "eated", "eating"],
+                answer: "eaten",
+                signal: "eat",
+                explanation: "The past participle (V3) of 'eat' is 'eaten' (eat - ate - eaten)."
+            },
+
+            // --- SECTION B: PRESENT PERFECT VS SIMPLE PAST TENSE USAGE (20 QUESTIONS) ---
+            {
+                id: 1,
+                type: "tense",
+                sentence: "I ______ my key yesterday, so I couldn't open the door.",
+                options: ["lost", "have lost", "has lost", "was losing"],
+                answer: "lost",
+                signal: "yesterday",
+                explanation: "'Yesterday' specifies a finished time in the past. Use Simple Past ('lost')."
+            },
+            {
+                id: 2,
+                type: "tense",
+                sentence: "She ______ in Hong Kong since 2018.",
+                options: ["lived", "has lived", "was living", "lives"],
+                answer: "has lived",
+                signal: "since 2018",
+                explanation: "'Since 2018' shows an action starting in the past and continuing to the present. Use Present Perfect ('has lived')."
+            },
+            {
+                id: 3,
+                type: "tense",
+                sentence: "They ______ Paris in 2021 on their family holiday.",
+                options: ["have visited", "visited", "visit", "were visiting"],
+                answer: "visited",
+                signal: "in 2021",
+                explanation: "'In 2021' is a finished past year. Use Simple Past ('visited')."
+            },
+            {
+                id: 4,
+                type: "tense",
+                sentence: "We ______ lunch already, so we aren't hungry now.",
+                options: ["have eaten", "ate", "eat", "were eating"],
+                answer: "have eaten",
+                signal: "already",
+                explanation: "'Already' indicates an action completed prior to the present moment. Use Present Perfect ('have eaten')."
+            },
+            {
+                id: 5,
+                type: "tense",
+                sentence: "Tom ______ his project two days ago.",
+                options: ["has finished", "finished", "finishes", "was finishing"],
+                answer: "finished",
+                signal: "two days ago",
+                explanation: "'Ago' always points to a completed time in the past. Use Simple Past ('finished')."
+            },
+            {
+                id: 6,
+                type: "tense",
+                sentence: "______ you ever seen a shooting star at night?",
+                options: ["Did", "Have", "Were", "Do"],
+                answer: "Have",
+                signal: "ever",
+                explanation: "'Ever' is used to ask about life experiences up to now. Use Present Perfect ('Have you ever...')."
+            },
+            {
+                id: 7,
+                type: "tense",
+                sentence: "I ______ my homework yet. Can I hand it in later?",
+                options: ["didn't finish", "haven't finished", "don't finish", "hadn't finished"],
+                answer: "haven't finished",
+                signal: "yet",
+                explanation: "'Yet' is used in negative sentences to show something hasn't happened up to now. Use Present Perfect."
+            },
+            {
+                id: 8,
+                type: "tense",
+                sentence: "Mr. Lee ______ at this school for ten years.",
+                options: ["taught", "has taught", "teaches", "was teaching"],
+                answer: "has taught",
+                signal: "for ten years",
+                explanation: "'For ten years' describes duration extending up to the present. Use Present Perfect ('has taught')."
+            },
+            {
+                id: 9,
+                type: "tense",
+                sentence: "My brother ______ his arm last Sunday while playing football.",
+                options: ["broke", "has broken", "breaks", "is breaking"],
+                answer: "broke",
+                signal: "last Sunday",
+                explanation: "'Last Sunday' is a clear finished past time marker. Use Simple Past ('broke')."
+            },
+            {
+                id: 10,
+                type: "tense",
+                sentence: "Look! Someone ______ their wallet on the floor.",
+                options: ["dropped", "has dropped", "was dropping", "drops"],
+                answer: "has dropped",
+                signal: "Look!",
+                explanation: "'Look!' draws attention to a past action with direct result in the present. Use Present Perfect ('has dropped')."
+            },
+            {
+                id: 11,
+                type: "tense",
+                sentence: "Where ______ you go last night at 8 PM?",
+                options: ["have", "did", "were", "do"],
+                answer: "did",
+                signal: "last night",
+                explanation: "'Last night' requires Simple Past question structure with 'did'."
+            },
+            {
+                id: 12,
+                type: "tense",
+                sentence: "I ______ never tried sushi before in my life.",
+                options: ["did", "have", "was", "am"],
+                answer: "have",
+                signal: "never",
+                explanation: "'Never' refers to total life experience up to the present. Use Present Perfect ('have never tried')."
+            },
+            {
+                id: 13,
+                type: "tense",
+                sentence: "The train ______ the platform just now.",
+                options: ["has left", "left", "leaves", "is leaving"],
+                answer: "left",
+                signal: "just now",
+                explanation: "'Just now' specifies a completed past moment. Use Simple Past ('left')."
+            },
+            {
+                id: 14,
+                type: "tense",
+                sentence: "Shakespeare ______ many famous plays in the 16th century.",
+                options: ["has written", "wrote", "was writing", "writes"],
+                answer: "wrote",
+                signal: "in the 16th century",
+                explanation: "Shakespeare is deceased and the 16th century is finished history. Use Simple Past ('wrote')."
+            },
+            {
+                id: 15,
+                type: "tense",
+                sentence: "We ______ three cups of tea so far this morning.",
+                options: ["drank", "have drunk", "drink", "were drinking"],
+                answer: "have drunk",
+                signal: "so far",
+                explanation: "'So far' means up until now within an unfinished time frame. Use Present Perfect ('have drunk')."
+            },
+            {
+                id: 16,
+                type: "tense",
+                sentence: "When ______ you buy your new puppy?",
+                options: ["have", "did", "do", "were"],
+                answer: "did",
+                signal: "When",
+                explanation: "Questions starting with 'When' ask for a specific point in finished time, requiring Simple Past ('did')."
+            },
+            {
+                id: 17,
+                type: "tense",
+                sentence: "Grandpa ______ his glasses this morning, but now he has found them.",
+                options: ["lost", "has lost", "loses", "was losing"],
+                answer: "lost",
+                signal: "this morning",
+                explanation: "The loss occurred at a specific past time ('this morning') and is now finished because he found them. Use Simple Past ('lost')."
+            },
+            {
+                id: 18,
+                type: "tense",
+                sentence: "She ______ to Japan twice this year.",
+                options: ["went", "has been", "was going", "goes"],
+                answer: "has been",
+                signal: "twice this year",
+                explanation: "Expressing frequency of experience within an unfinished timeframe ('this year') requires Present Perfect ('has been')."
+            },
+            {
+                id: 19,
+                type: "tense",
+                sentence: "The children ______ their bedroom an hour ago.",
+                options: ["have cleaned", "cleaned", "clean", "were cleaning"],
+                answer: "cleaned",
+                signal: "an hour ago",
+                explanation: "'Ago' marks a finished past moment. Use Simple Past ('cleaned')."
+            },
+            {
+                id: 20,
+                type: "tense",
+                sentence: "______ you seen the new Spider-Man movie recently?",
+                options: ["Did", "Have", "Do", "Were"],
+                answer: "Have",
+                signal: "recently",
+                explanation: "'Recently' connects past action to the present. Use Present Perfect ('Have you seen')."
+            }
+        ];
+
+        const AVATARS = ['🧙‍♂️', '🦸‍♀️', '🥷', '🦁', '🤖', '🦊', '🦄', '🐲', '🚀', '⭐'];
+    </script>
+
+    <script>
+        let player = {
+            name: '',
+            className: '',
+            classNo: '',
+            avatar: '🧙‍♂️',
+            hp: 100,
+            maxHp: 100
+        };
+
+        let boss = {
+            hp: 4000,
+            maxHp: 4000
+        };
+
+        let selectedMode = 'mixed'; // 'mixed', 'participle', 'tense'
+        let currentQuestions = [];
+        let currentIndex = 0;
+        let score = 0;
+        let correctCount = 0;
+        let streak = 0;
+        let timerInterval = null;
+        let timeLeft = 30;
+        let startTime = 0;
+        let totalTimeTaken = 0;
+        let userAnswersLog = [];
+
+        let powerups = {
+            freeze: 2,
+            fiftyFifty: 2,
+            hint: 2
+        };
+
+        window.onload = function() {
+            renderAvatarSelector();
+        };
+
+        function renderAvatarSelector() {
+            const container = document.getElementById('avatar-selector');
+            if (!container) return;
+            container.innerHTML = AVATARS.map((av, idx) => `
+                <button type="button" onclick="selectAvatar('${av}', this)" 
+                    class="avatar-btn text-2xl p-2 rounded-xl bg-slate-900 border ${idx === 0 ? 'border-brand-500 bg-brand-950/40' : 'border-slate-800'} hover:border-brand-400 flex items-center justify-center btn-touch">
+                    ${av}
+                </button>
+            `).join('');
+        }
+
+        function selectAvatar(avatarEmoji, btnEl) {
+            playSound('click');
+            player.avatar = avatarEmoji;
+            document.querySelectorAll('.avatar-btn').forEach(b => {
+                b.classList.remove('border-brand-500', 'bg-brand-950/40');
+                b.classList.add('border-slate-800');
+            });
+            btnEl.classList.remove('border-slate-800');
+            btnEl.classList.add('border-brand-500', 'bg-brand-950/40');
+        }
+
+        function selectMode(modeKey) {
+            playSound('click');
+            selectedMode = modeKey;
+            ['mixed', 'participle', 'tense'].forEach(m => {
+                const card = document.getElementById(`mode-${m}`);
+                if (m === modeKey) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+        }
+
+        function handleRegistration(e) {
+            e.preventDefault();
+            playSound('click');
+
+            const name = document.getElementById('input-name').value.trim();
+            const className = document.getElementById('input-class').value.trim().toUpperCase();
+            const classNo = document.getElementById('input-classno').value.trim();
+
+            if (!name || !className || !classNo) return;
+
+            player.name = name;
+            player.className = className;
+            player.classNo = classNo;
+
+            document.getElementById('header-avatar').innerText = player.avatar;
+            document.getElementById('header-name').innerText = player.name;
+            document.getElementById('header-class').innerText = `${player.className} (#${player.classNo})`;
+            document.getElementById('player-badge').classList.remove('hidden');
+
+            document.getElementById('player-avatar-battle').innerText = player.avatar;
+            document.getElementById('player-hud-name').innerText = player.name;
+
+            switchTab('lobby');
+        }
+
+        function switchTab(screenName) {
+            playSound('click');
+            ['login', 'lobby', 'game', 'results', 'leaderboard'].forEach(s => {
+                document.getElementById(`screen-${s}`).classList.add('hidden');
+            });
+            document.getElementById(`screen-${screenName}`).classList.remove('hidden');
+
+            if (screenName === 'leaderboard' && window.renderLeaderboard) {
+                window.renderLeaderboard();
+            }
+        }
+
+        function returnToLobbyOrGame() {
+            if (currentIndex > 0 && currentIndex < currentQuestions.length && !document.getElementById('screen-game').classList.contains('hidden')) {
+                switchTab('game');
+            } else {
+                switchTab('lobby');
+            }
+        }
+
+        function startQuiz() {
+            playSound('click');
+            
+            // Filter pool by mode
+            let pool = [];
+            if (selectedMode === 'participle') {
+                pool = QUESTION_DATABASE.filter(q => q.type === 'participle');
+            } else if (selectedMode === 'tense') {
+                pool = QUESTION_DATABASE.filter(q => q.type === 'tense');
+            } else {
+                pool = [...QUESTION_DATABASE]; // All 40
+            }
+
+            currentQuestions = pool.sort(() => 0.5 - Math.random());
+            currentIndex = 0;
+            score = 0;
+            correctCount = 0;
+            streak = 0;
+            totalTimeTaken = 0;
+            userAnswersLog = [];
+
+            player.hp = 100;
+            boss.hp = 4000;
+            updateHpBars();
+
+            document.getElementById('total-q-num').innerText = currentQuestions.length;
+
+            powerups = { freeze: 2, fiftyFifty: 2, hint: 2 };
+
+            updatePowerupButtons();
+            switchTab('game');
+            loadQuestion();
+            startTime = Date.now();
+        }
+
+        function loadQuestion() {
+            if (currentIndex >= currentQuestions.length || player.hp <= 0) {
+                endQuiz();
+                return;
+            }
+
+            const q = currentQuestions[currentIndex];
+
+            document.getElementById('current-q-num').innerText = currentIndex + 1;
+            document.getElementById('stage-num').innerText = Math.floor(currentIndex / 10) + 1;
+            document.getElementById('question-text').innerText = q.sentence;
+            document.getElementById('streak-count').innerText = `${streak}x Combo`;
+            document.getElementById('game-score').innerText = score;
+            document.getElementById('explanation-box').classList.add('hidden');
+
+            const container = document.getElementById('options-container');
+            container.innerHTML = q.options.map((opt, idx) => `
+                <button onclick="checkAnswer('${escapeOpt(opt)}', this)" 
+                    class="option-btn p-4 rounded-2xl bg-slate-900 hover:bg-slate-800/90 border border-slate-700/80 text-slate-100 font-bold text-left text-sm md:text-base flex items-center justify-between btn-touch transition-all">
+                    <div class="flex items-center space-x-3">
+                        <span class="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-black text-indigo-400">${String.fromCharCode(65 + idx)}</span>
+                        <span>${opt}</span>
+                    </div>
+                    <i class="fa-regular fa-circle text-slate-600 option-icon"></i>
+                </button>
+            `).join('');
+
+            resetTimer();
+        }
+
+        function escapeOpt(str) {
+            return str.replace(/'/g, "\\'");
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timeLeft = 30;
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeOut();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            document.getElementById('game-timer').innerText = `${timeLeft}s`;
+            const maxOffset = 81.6;
+            const offset = maxOffset - (timeLeft / 30) * maxOffset;
+            const circle = document.getElementById('timer-progress');
+            if (circle) {
+                circle.style.strokeDashoffset = offset;
+                if (timeLeft <= 5) {
+                    circle.classList.remove('text-brand-500');
+                    circle.classList.add('text-rose-500');
+                } else {
+                    circle.classList.remove('text-rose-500');
+                    circle.classList.add('text-brand-500');
+                }
+            }
+        }
+
+        function checkAnswer(selectedOpt, btnEl) {
+            clearInterval(timerInterval);
+            const q = currentQuestions[currentIndex];
+            const isCorrect = (selectedOpt === q.answer);
+
+            userAnswersLog.push({
+                question: q.sentence,
+                selected: selectedOpt,
+                answer: q.answer,
+                isCorrect: isCorrect,
+                explanation: q.explanation
+            });
+
+            const allBtns = document.querySelectorAll('.option-btn');
+            allBtns.forEach(b => {
+                b.disabled = true;
+                b.classList.add('opacity-60');
+            });
+
+            if (isCorrect) {
+                correctCount++;
+                streak++;
+
+                const isCrit = timeLeft >= 25;
+                if (isCrit) {
+                    playSound('crit');
+                    triggerCritAnimation();
+                } else {
+                    playSound('correct');
+                }
+
+                const streakBonus = Math.min(streak * 25, 125);
+                const speedBonus = timeLeft * 10;
+                const earned = 100 + streakBonus + speedBonus;
+                score += earned;
+
+                // Boss takes damage
+                const bossDamage = Math.round((4000 / currentQuestions.length) * (isCrit ? 1.3 : 1.0));
+                boss.hp = Math.max(0, boss.hp - bossDamage);
+                showDamagePopup(`-${bossDamage}`, 'boss');
+
+                btnEl.classList.remove('bg-slate-900', 'opacity-60', 'border-slate-700/80');
+                btnEl.classList.add('bg-emerald-950/80', 'border-emerald-500', 'text-emerald-200', 'ring-2', 'ring-emerald-500/50');
+                btnEl.querySelector('.option-icon').className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+
+                showExplanation(true, `⚔️ <strong>Hit!</strong> +${earned} Pts ${isCrit ? '(CRITICAL HIT!)' : ''}<br>${q.explanation}`);
+            } else {
+                playSound('wrong');
+                streak = 0;
+
+                // Player takes damage
+                player.hp = Math.max(0, player.hp - 15);
+                triggerScreenShake();
+                showDamagePopup('-15 HP', 'player');
+
+                btnEl.classList.remove('bg-slate-900', 'opacity-60', 'border-slate-700/80');
+                btnEl.classList.add('bg-rose-950/80', 'border-rose-500', 'text-rose-200');
+                btnEl.querySelector('.option-icon').className = 'fa-solid fa-circle-xmark text-rose-400 text-lg';
+
+                allBtns.forEach(b => {
+                    if (b.innerText.includes(q.answer)) {
+                        b.classList.remove('opacity-60', 'bg-slate-900');
+                        b.classList.add('bg-emerald-950/60', 'border-emerald-500/80', 'text-emerald-200');
+                    }
+                });
+
+                showExplanation(false, `🛡️ <strong>Titan Counter-Attacked!</strong> Correct Answer: <strong class="text-emerald-400">${q.answer}</strong>.<br>${q.explanation}`);
+            }
+
+            updateHpBars();
+            document.getElementById('streak-count').innerText = `${streak}x Combo`;
+            document.getElementById('game-score').innerText = score;
+        }
+
+        function handleTimeOut() {
+            const q = currentQuestions[currentIndex];
+            streak = 0;
+            playSound('wrong');
+
+            userAnswersLog.push({
+                question: q.sentence,
+                selected: 'Timed Out',
+                answer: q.answer,
+                isCorrect: false,
+                explanation: q.explanation
+            });
+
+            player.hp = Math.max(0, player.hp - 20);
+            triggerScreenShake();
+            showDamagePopup('-20 HP', 'player');
+            updateHpBars();
+
+            const allBtns = document.querySelectorAll('.option-btn');
+            allBtns.forEach(b => {
+                b.disabled = true;
+                b.classList.add('opacity-60');
+                if (b.innerText.includes(q.answer)) {
+                    b.classList.remove('opacity-60', 'bg-slate-900');
+                    b.classList.add('bg-emerald-950/60', 'border-emerald-500/80', 'text-emerald-200');
+                }
+            });
+
+            document.getElementById('streak-count').innerText = '0x Combo';
+            showExplanation(false, `⏰ <strong>Time's up!</strong> Correct Answer: <strong class="text-emerald-400">${q.answer}</strong>.<br>${q.explanation}`);
+        }
+
+        function updateHpBars() {
+            const playerPct = (player.hp / player.maxHp) * 100;
+            const bossPct = (boss.hp / boss.maxHp) * 100;
+
+            document.getElementById('player-hp-text').innerText = `${player.hp} / 100 HP`;
+            document.getElementById('player-hp-bar').style.width = `${playerPct}%`;
+
+            document.getElementById('boss-hp-text').innerText = `${boss.hp} / 4000 HP`;
+            document.getElementById('boss-hp-bar').style.width = `${bossPct}%`;
+        }
+
+        function showDamagePopup(text, target) {
+            const el = document.createElement('div');
+            el.className = 'damage-popup';
+            el.innerText = text;
+            if (target === 'boss') {
+                el.style.right = '10%';
+                el.style.top = '15%';
+                el.style.color = '#f59e0b';
+            } else {
+                el.style.left = '10%';
+                el.style.top = '15%';
+                el.style.color = '#f43f5e';
+            }
+            document.getElementById('battle-hud').appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        function triggerScreenShake() {
+            const arena = document.getElementById('question-card');
+            arena.classList.add('animate-shake');
+            setTimeout(() => arena.classList.remove('animate-shake'), 400);
+        }
+
+        function triggerCritAnimation() {
+            const bossEl = document.getElementById('boss-sprite');
+            bossEl.classList.add('animate-bounce');
+            setTimeout(() => bossEl.classList.remove('animate-bounce'), 600);
+        }
+
+        function showExplanation(isCorrect, text) {
+            const box = document.getElementById('explanation-box');
+            const icon = document.getElementById('explanation-icon');
+            const title = document.getElementById('explanation-title');
+            const textEl = document.getElementById('explanation-text');
+
+            box.classList.remove('hidden');
+            if (isCorrect) {
+                box.className = 'p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 transition-all duration-300';
+                icon.innerText = '⚡';
+                title.innerText = 'Strike Successful!';
+                title.className = 'text-xs font-black uppercase tracking-wider text-emerald-400';
+            } else {
+                box.className = 'p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 transition-all duration-300';
+                icon.innerText = '🛡️';
+                title.innerText = 'Grammar Clue Analysis';
+                title.className = 'text-xs font-black uppercase tracking-wider text-rose-400';
+            }
+
+            textEl.innerHTML = text;
+        }
+
+        function nextQuestion() {
+            playSound('click');
+            currentIndex++;
+            loadQuestion();
+        }
+
+        /* POWERUP SPELLS */
+        function useTimeFreeze() {
+            if (powerups.freeze <= 0) return;
+            playSound('spell');
+            timeLeft += 15;
+            updateTimerDisplay();
+            powerups.freeze--;
+            updatePowerupButtons();
+        }
+
+        function use5050() {
+            if (powerups.fiftyFifty <= 0) return;
+            playSound('spell');
+
+            const q = currentQuestions[currentIndex];
+            const allBtns = Array.from(document.querySelectorAll('.option-btn'));
+            const wrongBtns = allBtns.filter(b => !b.innerText.includes(q.answer));
+
+            wrongBtns.sort(() => 0.5 - Math.random());
+            wrongBtns.slice(0, 2).forEach(b => {
+                b.style.visibility = 'hidden';
+            });
+
+            powerups.fiftyFifty--;
+            updatePowerupButtons();
+        }
+
+        function useHint() {
+            if (powerups.hint <= 0) return;
+            playSound('spell');
+
+            const q = currentQuestions[currentIndex];
+            const qText = document.getElementById('question-text');
+            
+            if (q.signal) {
+                const regex = new RegExp(`(${q.signal})`, 'gi');
+                qText.innerHTML = q.sentence.replace(
+                    regex, 
+                    `<span class="highlight-signal">$1</span>`
+                );
+            }
+
+            powerups.hint--;
+            updatePowerupButtons();
+        }
+
+        function updatePowerupButtons() {
+            document.getElementById('count-freeze').innerText = powerups.freeze;
+            document.getElementById('count-5050').innerText = powerups.fiftyFifty;
+            document.getElementById('count-hint').innerText = powerups.hint;
+
+            document.getElementById('powerup-freeze').disabled = (powerups.freeze <= 0);
+            document.getElementById('powerup-5050').disabled = (powerups.fiftyFifty <= 0);
+            document.getElementById('powerup-hint').disabled = (powerups.hint <= 0);
+        }
+
+        /* END GAME & REVIEW MODE */
+        function endQuiz() {
+            clearInterval(timerInterval);
+            const endTime = Date.now();
+            totalTimeTaken = Math.round((endTime - startTime) / 1000);
+
+            const total = userAnswersLog.length;
+            const accuracy = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+
+            document.getElementById('res-accuracy').innerText = `${accuracy}%`;
+            document.getElementById('res-score').innerText = score;
+            document.getElementById('res-correct').innerText = `${correctCount} / ${total}`;
+            document.getElementById('res-time').innerText = `${totalTimeTaken}s`;
+
+            const resultTitle = document.getElementById('result-title');
+            const resultSubtitle = document.getElementById('result-subtitle');
+            const feedbackEl = document.getElementById('res-feedback');
+
+            if (boss.hp <= 0 || accuracy >= 80) {
+                resultTitle.innerText = "🏆 Titan Defeated!";
+                resultSubtitle.innerText = "You have conquered the Grammar Realm!";
+                feedbackEl.innerText = "🌟 Outstanding Master Grammarian! You demonstrate excellent mastery of irregular past participles (V3) and present perfect / simple past tense distinctions.";
+                playSound('fanfare');
+                triggerConfetti();
+            } else {
+                resultTitle.innerText = "🛡️ Quest Completed!";
+                resultSubtitle.innerText = "You survived the Grammar Battle!";
+                feedbackEl.innerText = "💪 Good effort! Keep practicing irregular verb forms (e.g., write-wrote-written, fly-flew-flown) and time signal words to achieve a 100% score!";
+                playSound('correct');
+            }
+
+            if (window.saveScoreToLeaderboard) {
+                window.saveScoreToLeaderboard(player, {
+                    score,
+                    accuracy,
+                    correctCount,
+                    totalQuestions: total,
+                    timeTaken: totalTimeTaken
+                });
+            }
+
+            renderReviewList();
+            switchTab('results');
+        }
+
+        function renderReviewList() {
+            const container = document.getElementById('review-container');
+            if (!container) return;
+
+            container.innerHTML = userAnswersLog.map((log, idx) => `
+                <div class="p-3.5 rounded-2xl bg-slate-900/90 border ${log.isCorrect ? 'border-emerald-500/30' : 'border-rose-500/30'}">
+                    <div class="flex items-start justify-between">
+                        <span class="text-xs font-bold text-slate-400">Q${idx + 1}. ${log.question}</span>
+                        <span class="text-xs font-black ${log.isCorrect ? 'text-emerald-400' : 'text-rose-400'} ml-2">
+                            ${log.isCorrect ? '✓ Correct' : '✗ Missed'}
+                        </span>
+                    </div>
+                    <div class="text-xs mt-1 space-y-0.5">
+                        <div class="text-slate-300">Your choice: <span class="font-bold ${log.isCorrect ? 'text-emerald-400' : 'text-rose-400'}">${log.selected}</span></div>
+                        ${!log.isCorrect ? `<div class="text-slate-300">Correct: <span class="font-bold text-emerald-400">${log.answer}</span></div>` : ''}
+                        <div class="text-indigo-300 text-[11px] pt-1">💡 ${log.explanation}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleReviewMode() {
+            playSound('click');
+            const container = document.getElementById('review-container');
+            container.classList.toggle('hidden');
+        }
+
+        function triggerConfetti() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        function resetAndPlayAgain() {
+            switchTab('lobby');
+        }
+    </script>
+</body>
+</html>
